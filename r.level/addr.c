@@ -1,5 +1,3 @@
-#include <grass/gis.h>
-
 #include "global.h"
 
 Addr *Addr_pop(Addr ** addr)

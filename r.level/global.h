@@ -6,6 +6,7 @@
 #include <grass/gis.h>
 #include <grass/glocale.h>
 #include <grass/raster.h>
+#include <grass/segment.h>
 
 #include "mask.h"
 #include "grid.h"
