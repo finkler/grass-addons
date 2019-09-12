@@ -2,41 +2,40 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "bitarray2d.h"
 #include "global.h"
 
+#define SIZE (nrows*ncols/WORD)
 #define WINDOW 8
 
 mask_t *Mask_allocate(void)
 {
-    int i;
-    mask_t *mask;
-
-    mask = G_malloc(sizeof(mask_t) * nrows);
-    for (i = 0; i < nrows; i++)
-        mask[i] = G_calloc(1, ncols);
-    return mask;
+    return G_calloc(sizeof(mask_t), SIZE);
 }
 
 unsigned long Mask_area(mask_t *mask)
 {
     unsigned long len;
-    int i, j;
+    int i, n;
 
-    len = 0;
-    for (i = 0; i < nrows; i++)
-        for (j = 0; j < ncols; j++)
-            len += mask[i][j];
+    for (i = 0; i < SIZE; i++) {
+        n = mask[i];
+        while (n) {
+            n &= n - 1;
+            len++;
+        }
+    }
     return len;
 }
 
 void Mask_clear(mask_t *mask)
 {
-    memset(mask, 0, nrows * ncols);
+    memset(mask, 0, sizeof(mask_t) * SIZE);
 }
 
 void Mask_copy(mask_t *dest, mask_t *src)
 {
-    memcpy(dest, src, nrows * ncols);
+    memcpy(dest, src, sizeof(mask_t) * SIZE);
 }
 
 void Mask_fill(mask_t *mask)
@@ -47,8 +46,8 @@ void Mask_fill(mask_t *mask)
     Addr_push(&addr, 0, 0);
     while (addr) {
         a = Addr_pop(&addr);
-        if (Mask_isset(mask, a->i, a->j)) {
-            mask[a->i][a->j] = 0;
+        if (bit2isset(mask, a->i, a->j)) {
+            bit2clear(mask, a->i, a->j);
             Addr_push(&addr, a->i, a->j + 1);
             Addr_push(&addr, a->i, a->j - 1);
             Addr_push(&addr, a->i + 1, a->j);
@@ -70,21 +69,22 @@ void Mask_filter(mask_t *mask, int pass)
 
     buf = Mask_allocate();
     while (pass-- > 0) {
+        #pragma omp parallel for private(i, j, k, n, window)
         for (i = 1; i < nrows - 1; i++)
             for (j = 1; j < ncols - 1; j++) {
-                window[0] = Mask_isset(mask, i, j - 1);
-                window[1] = Mask_isset(mask, i + 1, j - 1);
-                window[2] = Mask_isset(mask, i + 1, j);
-                window[3] = Mask_isset(mask, i + 1, j + 1);
-                window[4] = Mask_isset(mask, i, j + 1);
-                window[5] = Mask_isset(mask, i - 1, j + 1);
-                window[6] = Mask_isset(mask, i - 1, j);
-                window[7] = Mask_isset(mask, i - 1, j - 1);
+                window[0] = bit2isset(mask, i, j - 1);
+                window[1] = bit2isset(mask, i + 1, j - 1);
+                window[2] = bit2isset(mask, i + 1, j);
+                window[3] = bit2isset(mask, i + 1, j + 1);
+                window[4] = bit2isset(mask, i, j + 1);
+                window[5] = bit2isset(mask, i - 1, j + 1);
+                window[6] = bit2isset(mask, i - 1, j);
+                window[7] = bit2isset(mask, i - 1, j - 1);
                 n = 0;
                 for (k = 0; k < WINDOW; k++)
                     n += window[k];
                 if (n > 4)
-                    buf[i][j] = 1;
+                    bit2set(buf, i, j);
             }
         Mask_copy(mask, buf);
         Mask_clear(buf);
@@ -94,16 +94,12 @@ void Mask_filter(mask_t *mask, int pass)
 
 void Mask_free(mask_t *mask)
 {
-    int i;
-
-    for (i = 0; i < nrows; i++)
-        G_free(mask[i]);
     G_free(mask);
 }
 
 int Mask_isset(mask_t *mask, int i, int j)
 {
-    return mask[i][j];
+    return bit2isset(mask, i, j);
 }
 
 void Mask_set(mask_t *mask, int sign, float z)
@@ -111,18 +107,19 @@ void Mask_set(mask_t *mask, int sign, float z)
     int i, j;
     FCELL *row;
 
+    #pragma omp parallel for private(i, j, row)
     for (i = 0; i < nrows; i++) {
         row = Grid_get_row(i);
-        #pragma omp parallel for
         for (j = 0; j < ncols; j++) {
             if (i == 0 || i == nrows - 1 || j == 0 || j == ncols - 1) {
-                mask[i][j] = 1;
+                bit2set(mask, i, j);
                 continue;
             }
             if (isnan(row[j]))
                 continue;
             if (sign * (row[j] - z) > 0)
-                mask[i][j] = 1;
+                bit2set(mask, i, j);
         }
+        G_free(row);
     }
 }

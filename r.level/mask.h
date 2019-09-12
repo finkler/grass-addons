@@ -1,7 +1,7 @@
 #ifndef _MASK_H
 #define _MASK_H
 
-typedef char *mask_t;
+typedef int mask_t;
 
 mask_t *Mask_allocate(void);
 unsigned long Mask_area(mask_t *);
