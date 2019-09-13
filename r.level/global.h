@@ -1,3 +1,17 @@
+/*
+ * Declarations for the whole module
+ *
+ * Authors:
+ *   Thomas Kreuzer <thomas kreuzer at rwth-aachen de>
+ *
+ * Copyright 2019 by Thomas Kreuzer
+ *
+ * This program is free software licensed under the GPL (>=v2).
+ * Read the COPYING file that comes with GRASS for details.
+ *
+ */
+
+
 #ifndef _GLOBAL_H
 #define _GLOBAL_H
 
