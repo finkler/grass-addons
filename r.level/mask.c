@@ -15,17 +15,7 @@ mask_t *Mask_allocate(void)
 
 unsigned long Mask_area(mask_t *mask)
 {
-    unsigned long len;
-    int i, n;
-
-    for (i = 0; i < SIZE; i++) {
-        n = mask[i];
-        while (n) {
-            n &= n - 1;
-            len++;
-        }
-    }
-    return len;
+    return bit2length(mask, SIZE);
 }
 
 void Mask_clear(mask_t *mask)
@@ -44,8 +34,8 @@ void Mask_fill(mask_t *mask)
 
     addr = NULL;
     Addr_push(&addr, 0, 0);
-    while (addr) {
-        a = Addr_pop(&addr);
+    #pragma omp parallel for private(a)
+    for (a = Addr_pop(&addr); addr; a = Addr_pop(&addr)) {
         if (bit2isset(mask, a->i, a->j)) {
             bit2clear(mask, a->i, a->j);
             Addr_push(&addr, a->i, a->j + 1);

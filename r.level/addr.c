@@ -5,6 +5,7 @@ Addr *Addr_pop(Addr ** addr)
     Addr *a;
 
     a = *addr;
+    #pragma omp atomic write
     *addr = a->next;
     return a;
 }
@@ -21,9 +22,11 @@ void Addr_push(Addr ** addr, int i, int j)
     a->j = j;
     a->next = NULL;
     if (*addr == NULL) {
+        #pragma omp atomic write
         *addr = a;
         return;
     }
     a->next = *addr;
+    #pragma omp atomic write
     *addr = a;
 }

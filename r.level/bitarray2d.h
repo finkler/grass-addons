@@ -4,6 +4,7 @@
 #define WORD (sizeof(int)<<3UL)
 
 void bit2clear(int *, int, int);
+unsigned long bit2length(int *, int);
 int bit2isset(int *, int, int);
 void bit2set(int *, int, int);
 void bit2toggle(int *, int, int);
