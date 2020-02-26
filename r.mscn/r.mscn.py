@@ -16,25 +16,11 @@
 #%module
 #% description: Calcuates MSCN coefficents
 #% keyword: raster
-#% overwrite: yes
 #%end
-#%option G_OPT_R_INPUT
-#% description: Shaded relief map
-#% required: YES
-#%end
-#%option G_OPT_R_BASENAME_OUTPUT
-#% required: YES
-#%end
-#%option
-#% key: kernel
-#% type: integer
-#% description: Kernel size
-#% answer: 6
-#% required: NO
-#%End
 
 # https://ieeexplore.ieee.org/document/6272356
 # https://towardsdatascience.com/automatic-image-quality-assessment-in-python-391a6be52c11
+import grass.script as grass
 import numpy as np
 import sys
 
@@ -42,14 +28,9 @@ from grass.pygrass import raster
 from scipy import signal
 
 
-def var(i, mu, w):
-    sigma = i ** 2
-    sigma = signal.convolve2d(sigma, w, "same")
-    return np.sqrt(np.abs(mu ** 2 - sigma))
-
-
-def kernels(n, sigma):
+def kern(n, k):
     m = 2 * n + 1
+    sigma = np.sqrt(np.square(np.arange(m) - n).mean()) * k
     Y, X = np.indices((m, m)) - n
     G = (
         1.0
@@ -59,18 +40,45 @@ def kernels(n, sigma):
     return G / np.sum(G)
 
 
+def std(i, mu, w):
+    sigma = signal.convolve2d(i ** 2, w, "same")
+    return np.sqrt(np.abs(mu ** 2 - sigma))
+
+
+def write_raster(arr, name, overwrite=True, mtype="FCELL"):
+    new = raster.RasterRow(name)
+    new.open("w", mtype, overwrite)
+    for i in arr:
+        buf = raster.buffer.Buffer(i.shape, mtype=mtype)
+        np.copyto(buf, i)
+        new.put_row(buf)
+    new.close()
+
+
 def main():
-    shade = raster.RasterRow(options["input"])
-    shade.open()
-    i = np.zeros((shade._rows, shade._cols), dtype=np.ubyte)
-    for j, row in enumerate(shade):
+    r = raster.RasterRow("dem_1m_norm")
+    r.open()
+    i = np.full((r._rows, r._cols), np.nan)
+    for j, row in enumerate(r):
         i[j, :] = row
-    shade.close()
-    w = kernels(3, 7/6)
+    r.close()
+
+    w = kern(3, 3)
     mu = signal.convolve2d(i, w, "same")
-    sigma = var(i, mu, w)
+    # write_raster(mu, "local_mean_field")
+
+    sigma = std(i, mu, w)
+    # write_raster(sigma, "local_variance_field")
+
+    c = i - mu
+    # write_raster(c, "zero_log_contrast")
+
+    C = 1.0 / 255.0
+    mscn = c / (sigma + C)
+    write_raster(mscn, "mscn_field")
     return 0
 
 
 if __name__ == "__main__":
+    options, flags = grass.parser()
     sys.exit(main())
